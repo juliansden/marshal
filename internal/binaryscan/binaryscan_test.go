@@ -13,7 +13,9 @@ import (
 func TestScanTargetEndToEnd(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req osvBatchRequest
-		json.NewDecoder(r.Body).Decode(&req)
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decoding request: %v", err)
+		}
 
 		results := make([]osvBatchResult, len(req.Queries))
 		for i, q := range req.Queries {
@@ -26,7 +28,9 @@ func TestScanTargetEndToEnd(t *testing.T) {
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(osvBatchResponse{Results: results})
+		if err := json.NewEncoder(w).Encode(osvBatchResponse{Results: results}); err != nil {
+			t.Fatalf("encoding response: %v", err)
+		}
 	}))
 	defer server.Close()
 

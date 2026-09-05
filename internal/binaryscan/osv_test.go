@@ -28,7 +28,9 @@ func TestQueryLibrariesSuccess(t *testing.T) {
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			t.Fatalf("encoding response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -78,7 +80,9 @@ func TestQueryLibrariesSkipsUndeterminedVersion(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(osvBatchResponse{})
+		if err := json.NewEncoder(w).Encode(osvBatchResponse{}); err != nil {
+			t.Fatalf("encoding response: %v", err)
+		}
 	}))
 	defer server.Close()
 
