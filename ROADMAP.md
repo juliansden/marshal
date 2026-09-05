@@ -13,32 +13,32 @@ This roadmap outlines the planned development phases. Each phase is designed to 
 ### Package & File-Level TODOs
 
 - **`internal/findings/findings.go`**
-  - [ ] Finalize `Finding`, `Location` (`FileLocation`, `URLLocation`), `Severity`, `EngineType`, and `TriageResult` structs.
-  - [ ] Implement `Fingerprint()` generation helper (SHA-256 hash of location, rule/CVE ID, and normalized title).
-  - [ ] Implement JSON marshaling/unmarshaling validation for `Location`.
+  - [x] Finalize `Finding`, `Location` (`FileLocation`, `URLLocation`), `Severity`, `EngineType`, and `TriageResult` structs.
+  - [x] Implement `ComputeFingerprint()` generation helper (SHA-256 hash of location, rule/CVE ID, and normalized title).
+  - [x] Implement JSON marshaling/unmarshaling validation for `Location`.
 
 - **`internal/binaryscan/parser.go`**
   - [ ] Implement ELF parser using `debug/elf` to extract embedded symbol tables, `.comment` sections, and build IDs.
-  - [ ] Implement Mach-O parser using `debug/macho` to inspect load commands and dynamic symbol tables.
+  - [x] Implement Mach-O parser using `debug/macho` to inspect load commands and dynamic symbol tables (including fat/universal binaries).
   - [ ] Implement PE parser using `debug/pe` to extract COFF headers and export/import directories.
 
 - **`internal/binaryscan/fingerprint.go`**
-  - [ ] Implement static library fingerprinting algorithm (matching symbol name sets against known static lib signatures).
-  - [ ] Integrate local CVE lookup database/index (OSV database format or SQLite embedded mirror).
+  - [x] Implement static library fingerprinting algorithm (matching symbol name sets against known static lib signatures).
+  - [x] Integrate CVE lookup via live queries to the public [OSV.dev](https://osv.dev) API (`api.osv.dev/v1/querybatch`), scoped per detected library + resolved version. Queries are skipped when a version can't be determined, to avoid flooding results with a package's entire historical CVE list. *(Future enhancement: optional local OSV mirror for fully offline/air-gapped scanning.)*
 
 - **`internal/binaryscan/binaryscan.go`**
-  - [ ] Wire parsers and fingerprinting into `Scanner.ScanTarget(ctx, binaryPath)`.
-  - [ ] Map detected vulnerable library symbols to `findings.Finding` instances with `EngineBinarySCA`.
+  - [x] Wire parsers and fingerprinting into `Scanner.ScanTarget(ctx, binaryPath)`.
+  - [x] Map detected vulnerable library symbols to `findings.Finding` instances with `EngineBinarySCA`.
 
 - **`internal/report/sarif.go`**
-  - [ ] Implement SARIF v2.1.0 exporter (`OASIS SARIF` spec) converting `[]findings.Finding` to standard SARIF log format for GitHub Code Scanning / VS Code Problems panel integration.
+  - [x] Implement SARIF v2.1.0 exporter (`OASIS SARIF` spec) converting `[]findings.Finding` to standard SARIF log format for GitHub Code Scanning / VS Code Problems panel integration.
 
 - **`internal/report/json.go` & `internal/report/junit.go`**
-  - [ ] Implement raw JSON array exporter.
-  - [ ] Implement JUnit XML report exporter for CI/CD test runner integration.
+  - [x] Implement raw JSON array exporter.
+  - [x] Implement JUnit XML report exporter for CI/CD test runner integration.
 
 - **`cmd/marshal/scan.go`**
-  - [ ] Connect `marshal scan <binary>` to invoke `binaryscan` and write formatted reports via `internal/report`.
+  - [x] Connect `marshal scan <binary>` to invoke `binaryscan` and write formatted reports via `internal/report`.
 
 ---
 

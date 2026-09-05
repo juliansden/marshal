@@ -2,8 +2,12 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/marshal-security/marshal/internal/binaryscan"
+	"github.com/marshal-security/marshal/internal/report"
 )
 
 var (
@@ -13,28 +17,42 @@ var (
 )
 
 var scanCmd = &cobra.Command{
-	Use:   "scan [target]",
+	Use:   "scan <target>",
 	Short: "Run security analysis on target binaries, codebases, or reports",
 	Long: `Scan inspects compiled binaries, source code, or adapter inputs, correlates findings,
 and optionally performs LLM-based reachability triage.`,
-	Args: cobra.MaximumNArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		target := "."
-		if len(args) > 0 {
-			target = args[0]
+		target := args[0]
+
+		exporter, err := report.NewExporter(report.Format(formatFlag))
+		if err != nil {
+			return err
 		}
 
-		cmd.Printf("Marshal security scan initiated for target: %s\n", target)
-		cmd.Printf("Output format: %s\n", formatFlag)
+		scanner := binaryscan.NewScanner()
+		results, err := scanner.ScanTarget(cmd.Context(), target)
+		if err != nil {
+			return fmt.Errorf("scan failed: %w", err)
+		}
+
 		if enableTriage {
-			cmd.Println("LLM Reachability Triage: Enabled (Opt-in)")
-		} else {
-			cmd.Println("LLM Reachability Triage: Disabled (Default)")
+			if _, err := fmt.Fprintln(cmd.ErrOrStderr(), "LLM Reachability Triage: Enabled (Opt-in) -- not yet implemented, findings unmodified"); err != nil {
+				return fmt.Errorf("writing triage status: %w", err)
+			}
 		}
 
-		// Skeleton notice for v1 scaffold
-		fmt.Println("Scan engine initialized. Run phase components will execute here.")
-		return nil
+		out := cmd.OutOrStdout()
+		if outputFlag != "" {
+			f, err := os.Create(outputFlag)
+			if err != nil {
+				return fmt.Errorf("creating output file: %w", err)
+			}
+			defer f.Close()
+			out = f
+		}
+
+		return exporter.Export(out, results)
 	},
 }
 
