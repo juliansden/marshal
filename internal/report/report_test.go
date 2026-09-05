@@ -13,6 +13,7 @@ import (
 func sampleFindings() []findings.Finding {
 	f1 := findings.Finding{
 		Engine:   findings.EngineBinarySCA,
+		ID:       "OSV-2021-1234",
 		CVE:      "CVE-2021-1234",
 		Severity: findings.SeverityHigh,
 		Title:    "Vulnerable statically-linked library: openssl",
@@ -129,5 +130,8 @@ func TestJUnitExport(t *testing.T) {
 	}
 	if out.Suites[0].Cases[0].Failure.Message != "Vulnerable statically-linked library: openssl" {
 		t.Errorf("unexpected failure message: %s", out.Suites[0].Cases[0].Failure.Message)
+	}
+	if out.Suites[0].Cases[0].Name != "bin/myapp [OSV-2021-1234]" {
+		t.Errorf("unexpected testcase name: %s", out.Suites[0].Cases[0].Name)
 	}
 }

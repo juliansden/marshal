@@ -1,6 +1,7 @@
 package binaryscan
 
 import (
+	"encoding/binary"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -64,5 +65,40 @@ func TestDetectFormatAndParse(t *testing.T) {
 				t.Errorf("expected non-empty Arch")
 			}
 		})
+	}
+}
+
+func TestExtractGNUBuildIDByteOrder(t *testing.T) {
+	noteLE := []byte{
+		0x04, 0x00, 0x00, 0x00, // namesz
+		0x03, 0x00, 0x00, 0x00, // descsz
+		0x03, 0x00, 0x00, 0x00, // type
+		'G', 'N', 'U', 0x00, // name
+		0x01, 0x02, 0x03, // desc
+	}
+	if got := extractGNUBuildID(noteLE, binary.LittleEndian); got != "010203" {
+		t.Fatalf("little-endian build ID = %q, want %q", got, "010203")
+	}
+
+	noteBE := []byte{
+		0x00, 0x00, 0x00, 0x04, // namesz
+		0x00, 0x00, 0x00, 0x03, // descsz
+		0x00, 0x00, 0x00, 0x03, // type
+		'G', 'N', 'U', 0x00, // name
+		0x0a, 0x0b, 0x0c, // desc
+	}
+	if got := extractGNUBuildID(noteBE, binary.BigEndian); got != "0a0b0c" {
+		t.Fatalf("big-endian build ID = %q, want %q", got, "0a0b0c")
+	}
+}
+
+func TestExtractGNUBuildIDRejectsOverflow(t *testing.T) {
+	note := []byte{
+		0xff, 0xff, 0xff, 0xff, // namesz
+		0xff, 0xff, 0xff, 0xff, // descsz
+		0x03, 0x00, 0x00, 0x00, // type
+	}
+	if got := extractGNUBuildID(note, binary.LittleEndian); got != "" {
+		t.Fatalf("expected empty build ID for malformed note, got %q", got)
 	}
 }

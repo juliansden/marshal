@@ -22,36 +22,22 @@ type librarySignature struct {
 var knownSignatures = []librarySignature{
 	{
 		Name:          "openssl",
-		OSVEcosystem:  "Debian",
-		OSVPackage:    "openssl",
 		SymbolMarkers: []string{"SSL_CTX_new", "OPENSSL_init_ssl"},
-		VersionSymbols: map[string]string{
-			"1.1.1": "OPENSSL_1_1_1",
-			"3.0.0": "OPENSSL_3_0_0",
-		},
 	},
 	{
 		Name:          "zlib",
-		OSVEcosystem:  "Debian",
-		OSVPackage:    "zlib",
 		SymbolMarkers: []string{"inflate", "deflate", "zlibVersion"},
 	},
 	{
 		Name:          "libcurl",
-		OSVEcosystem:  "Debian",
-		OSVPackage:    "curl",
 		SymbolMarkers: []string{"curl_easy_init", "curl_easy_perform"},
 	},
 	{
 		Name:          "libxml2",
-		OSVEcosystem:  "Debian",
-		OSVPackage:    "libxml2",
 		SymbolMarkers: []string{"xmlParseDocument", "xmlReadMemory"},
 	},
 	{
 		Name:          "libpng",
-		OSVEcosystem:  "Debian",
-		OSVPackage:    "libpng",
 		SymbolMarkers: []string{"png_create_read_struct", "png_read_image"},
 	},
 }

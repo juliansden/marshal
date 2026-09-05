@@ -17,16 +17,13 @@ var (
 )
 
 var scanCmd = &cobra.Command{
-	Use:   "scan [target]",
+	Use:   "scan <target>",
 	Short: "Run security analysis on target binaries, codebases, or reports",
 	Long: `Scan inspects compiled binaries, source code, or adapter inputs, correlates findings,
 and optionally performs LLM-based reachability triage.`,
-	Args: cobra.MaximumNArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		target := "."
-		if len(args) > 0 {
-			target = args[0]
-		}
+		target := args[0]
 
 		exporter, err := report.NewExporter(report.Format(formatFlag))
 		if err != nil {
@@ -40,7 +37,9 @@ and optionally performs LLM-based reachability triage.`,
 		}
 
 		if enableTriage {
-			cmd.Println("LLM Reachability Triage: Enabled (Opt-in) -- not yet implemented, findings unmodified")
+			if _, err := fmt.Fprintln(cmd.ErrOrStderr(), "LLM Reachability Triage: Enabled (Opt-in) -- not yet implemented, findings unmodified"); err != nil {
+				return fmt.Errorf("writing triage status: %w", err)
+			}
 		}
 
 		out := cmd.OutOrStdout()

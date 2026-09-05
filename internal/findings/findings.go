@@ -193,12 +193,44 @@ func (f Finding) ComputeFingerprint() string {
 	normalizedTitle := strings.ToLower(strings.TrimSpace(f.Title))
 
 	h := sha256.New()
-	h.Write([]byte(f.Location.String()))
+	h.Write([]byte(f.locationIdentity()))
 	h.Write([]byte{0})
 	h.Write([]byte(ruleOrCVE))
 	h.Write([]byte{0})
 	h.Write([]byte(normalizedTitle))
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+func (f Finding) locationIdentity() string {
+	l := f.Location
+	switch l.Type {
+	case LocationTypeFile:
+		if l.File == nil {
+			return "file::"
+		}
+		return fmt.Sprintf(
+			"file:%s:%d:%d:%d:%d",
+			l.File.Path,
+			l.File.StartLine,
+			l.File.EndLine,
+			l.File.StartCol,
+			l.File.EndCol,
+		)
+	case LocationTypeURL:
+		if l.URL == nil {
+			return "url::"
+		}
+		return fmt.Sprintf(
+			"url:%s:%s:%s:%s:%d",
+			l.URL.Method,
+			l.URL.URL,
+			l.URL.Parameter,
+			l.URL.Header,
+			l.URL.StatusCode,
+		)
+	default:
+		return string(l.Type)
+	}
 }
 
 // NormalizeSeverity returns a standardized severity string.

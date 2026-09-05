@@ -12,24 +12,37 @@ import (
 
 // Scanner performs binary composition analysis on target executable binaries.
 type Scanner struct {
-	osvClient *OSVClient
+	osvClient    *OSVClient
+	parseBinary  func(string) (*BinaryInfo, error)
+	matchLibrary func(BinaryInfo) []LibraryMatch
 }
 
 // NewScanner initializes a new Scanner instance.
 func NewScanner() *Scanner {
-	return &Scanner{osvClient: NewOSVClient()}
+	return &Scanner{
+		osvClient:    NewOSVClient(),
+		parseBinary:  ParseBinary,
+		matchLibrary: MatchSignatures,
+	}
 }
 
 // ScanTarget analyzes the specified binary file, fingerprints statically-linked
 // libraries, enriches matches with known vulnerabilities via OSV.dev, and
 // returns the resulting findings.
 func (s *Scanner) ScanTarget(ctx context.Context, targetPath string) ([]findings.Finding, error) {
-	info, err := ParseBinary(targetPath)
+	if s.parseBinary == nil {
+		s.parseBinary = ParseBinary
+	}
+	if s.matchLibrary == nil {
+		s.matchLibrary = MatchSignatures
+	}
+
+	info, err := s.parseBinary(targetPath)
 	if err != nil {
 		return nil, err
 	}
 
-	matches := MatchSignatures(*info)
+	matches := s.matchLibrary(*info)
 	if len(matches) == 0 {
 		return nil, nil
 	}
@@ -41,10 +54,18 @@ func (s *Scanner) ScanTarget(ctx context.Context, targetPath string) ([]findings
 
 	var results []findings.Finding
 	for _, match := range matches {
-		for _, vuln := range vulnsByLib[match.Signature.Name] {
+		vulns := vulnsByLib[match.Signature.Name]
+		if len(vulns) == 0 {
+			results = append(results, unmatchedLibraryFinding(targetPath, *info, match))
+			continue
+		}
+		for _, vuln := range vulns {
+			cve := primaryCVEAlias(vuln)
 			f := findings.Finding{
 				Engine:      findings.EngineBinarySCA,
-				CVE:         primaryCVEAlias(vuln),
+				ID:          vuln.ID,
+				RuleID:      vuln.ID,
+				CVE:         cve,
 				Severity:    findings.NormalizeSeverity(vuln.Severity),
 				Title:       fmt.Sprintf("Vulnerable statically-linked library: %s", match.Signature.Name),
 				Description: vuln.Summary,
@@ -66,13 +87,39 @@ func (s *Scanner) ScanTarget(ctx context.Context, targetPath string) ([]findings
 	return results, nil
 }
 
-// primaryCVEAlias returns the first CVE-formatted alias for a vulnerability, falling
-// back to the OSV ID itself if no CVE alias is present.
+func unmatchedLibraryFinding(targetPath string, info BinaryInfo, match LibraryMatch) findings.Finding {
+	description := "Detected statically-linked library; CVE enrichment unavailable without version and package provenance."
+	if match.Version != "" {
+		description = "Detected statically-linked library; CVE enrichment unavailable with current ecosystem/package metadata."
+	}
+	f := findings.Finding{
+		ID:          fmt.Sprintf("binaryscan-%s-unenriched", match.Signature.Name),
+		RuleID:      fmt.Sprintf("binaryscan-%s-unenriched", match.Signature.Name),
+		Engine:      findings.EngineBinarySCA,
+		Severity:    findings.SeverityInfo,
+		Title:       fmt.Sprintf("Detected statically-linked library: %s", match.Signature.Name),
+		Description: description,
+		Location: findings.Location{
+			Type: findings.LocationTypeFile,
+			File: &findings.FileLocation{Path: targetPath},
+		},
+		Metadata: map[string]any{
+			"library":     match.Signature.Name,
+			"version":     match.Version,
+			"osv_id":      "",
+			"binary_arch": info.Arch,
+		},
+	}
+	f.Fingerprint = f.ComputeFingerprint()
+	return f
+}
+
+// primaryCVEAlias returns the first CVE-formatted alias for a vulnerability.
 func primaryCVEAlias(vuln OSVVuln) string {
 	for _, alias := range vuln.Aliases {
 		if len(alias) > 4 && alias[:4] == "CVE-" {
 			return alias
 		}
 	}
-	return vuln.ID
+	return ""
 }

@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -34,39 +32,41 @@ func TestScanTargetEndToEnd(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// A trivial ELF binary won't contain OpenSSL symbols, so exercise the
-	// scanner pipeline directly against a stub-injected parse result instead
-	// of relying on binary content matching.
-	scanner := &Scanner{osvClient: &OSVClient{httpClient: server.Client(), baseURL: server.URL, maxRetries: 1}}
-
-	tmpDir := t.TempDir()
-	target := filepath.Join(tmpDir, "fixture.bin")
-	if err := os.WriteFile(target, []byte("placeholder"), 0o644); err != nil {
-		t.Fatalf("writing fixture: %v", err)
+	scanner := &Scanner{
+		osvClient: &OSVClient{httpClient: server.Client(), baseURL: server.URL, maxRetries: 1},
+		parseBinary: func(path string) (*BinaryInfo, error) {
+			return &BinaryInfo{Path: path, Format: "elf", Arch: "amd64"}, nil
+		},
+		matchLibrary: func(BinaryInfo) []LibraryMatch {
+			return []LibraryMatch{
+				{
+					Signature: librarySignature{
+						Name:         "openssl",
+						OSVEcosystem: "OSS-Fuzz",
+						OSVPackage:   "openssl",
+					},
+					Version: "1.1.1",
+				},
+			}
+		},
 	}
 
-	matches := MatchSignatures(BinaryInfo{
-		Symbols: []string{"SSL_CTX_new", "OPENSSL_init_ssl", "OPENSSL_1_1_1"},
-	})
-	if len(matches) != 1 {
-		t.Fatalf("expected 1 signature match, got %d", len(matches))
-	}
-
-	vulnsByLib, err := scanner.osvClient.QueryLibraries(context.Background(), matches)
+	results, err := scanner.ScanTarget(context.Background(), "fixture.bin")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(vulnsByLib["openssl"]) != 1 {
-		t.Fatalf("expected 1 vuln for openssl, got %d", len(vulnsByLib["openssl"]))
+	if len(results) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(results))
+	}
+	if results[0].CVE != "CVE-2021-1234" {
+		t.Fatalf("expected CVE alias, got %q", results[0].CVE)
 	}
 }
 
 func TestScanTargetNoMatchesReturnsNil(t *testing.T) {
 	scanner := NewScanner()
 
-	tmpDir := t.TempDir()
 	target := buildFixture(t, "linux", "amd64", "fixture_elf")
-	_ = tmpDir
 
 	results, err := scanner.ScanTarget(context.Background(), target)
 	if err != nil {
@@ -74,5 +74,28 @@ func TestScanTargetNoMatchesReturnsNil(t *testing.T) {
 	}
 	if len(results) != 0 {
 		t.Errorf("expected no findings for a binary with no known signatures, got %d", len(results))
+	}
+}
+
+func TestScanTargetReportsUnenrichedMatch(t *testing.T) {
+	scanner := &Scanner{
+		osvClient: &OSVClient{httpClient: http.DefaultClient, baseURL: "http://127.0.0.1:0", maxRetries: 0},
+		parseBinary: func(path string) (*BinaryInfo, error) {
+			return &BinaryInfo{Path: path, Format: "elf", Arch: "amd64"}, nil
+		},
+		matchLibrary: func(BinaryInfo) []LibraryMatch {
+			return []LibraryMatch{{Signature: librarySignature{Name: "zlib"}}}
+		},
+	}
+
+	results, err := scanner.ScanTarget(context.Background(), "fixture.bin")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(results))
+	}
+	if results[0].Severity != "INFO" {
+		t.Fatalf("expected INFO severity, got %s", results[0].Severity)
 	}
 }

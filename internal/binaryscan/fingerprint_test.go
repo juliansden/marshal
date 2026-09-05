@@ -13,8 +13,8 @@ func TestMatchSignaturesDetectsOpenSSL(t *testing.T) {
 	if matches[0].Signature.Name != "openssl" {
 		t.Errorf("expected openssl match, got %s", matches[0].Signature.Name)
 	}
-	if matches[0].Version != "1.1.1" {
-		t.Errorf("expected version 1.1.1, got %q", matches[0].Version)
+	if matches[0].Version != "" {
+		t.Errorf("expected undetermined version, got %q", matches[0].Version)
 	}
 }
 

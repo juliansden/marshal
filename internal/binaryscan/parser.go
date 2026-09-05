@@ -5,10 +5,13 @@ import (
 	"debug/elf"
 	"debug/macho"
 	"debug/pe"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
+	"slices"
+	"strings"
 )
 
 // BinaryInfo captures the format-agnostic facts extracted from a binary
@@ -107,7 +110,7 @@ func parseELF(path string) (*BinaryInfo, error) {
 
 	if section := f.Section(".note.gnu.build-id"); section != nil {
 		if data, err := section.Data(); err == nil {
-			info.BuildID = extractGNUBuildID(data)
+			info.BuildID = extractGNUBuildID(data, f.ByteOrder)
 		}
 	}
 
@@ -115,38 +118,68 @@ func parseELF(path string) (*BinaryInfo, error) {
 }
 
 // extractGNUBuildID parses the payload of a .note.gnu.build-id ELF note section.
-func extractGNUBuildID(note []byte) string {
+func extractGNUBuildID(note []byte, byteOrder binary.ByteOrder) string {
 	// ELF notes: namesz(4) + descsz(4) + type(4) + name (padded) + desc (padded).
 	if len(note) < 12 {
 		return ""
 	}
-	nameSize := hostEndianUint32(note[0:4])
-	descSize := hostEndianUint32(note[4:8])
-	nameEnd := 12 + align4(nameSize)
-	descEnd := nameEnd + descSize
-	if int(descEnd) > len(note) || int(nameEnd) > len(note) {
+	nameSize := uint64(byteOrder.Uint32(note[0:4]))
+	descSize := uint64(byteOrder.Uint32(note[4:8]))
+	nameEnd := uint64(12) + align4(nameSize)
+	if nameEnd > uint64(len(note)) {
 		return ""
 	}
-	return hex.EncodeToString(note[nameEnd:descEnd])
+	descEnd := nameEnd + descSize
+	if descEnd < nameEnd || descEnd > uint64(len(note)) {
+		return ""
+	}
+	return hex.EncodeToString(note[int(nameEnd):int(descEnd)])
 }
 
-func hostEndianUint32(b []byte) uint32 {
-	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
-}
-
-func align4(n uint32) uint32 {
+func align4(n uint64) uint64 {
 	return (n + 3) &^ 3
 }
 
 // parseMachO extracts symbol tables, dylib dependencies, and UUID load command from a Mach-O binary.
-// Universal/fat binaries are supported by analyzing their first contained architecture slice.
+// Universal/fat binaries are supported by analyzing all contained architecture slices.
 func parseMachO(path string) (*BinaryInfo, error) {
 	if fat, err := macho.OpenFat(path); err == nil {
 		defer fat.Close()
 		if len(fat.Arches) == 0 {
 			return nil, fmt.Errorf("binaryscan: fat Mach-O %s has no architecture slices", path)
 		}
-		return binaryInfoFromMachO(path, fat.Arches[0].File)
+		info := &BinaryInfo{Path: path, Format: "macho"}
+		seenSyms := make(map[string]struct{})
+		seenLibs := make(map[string]struct{})
+		archSet := make(map[string]struct{}, len(fat.Arches))
+		for _, arch := range fat.Arches {
+			sliceInfo := binaryInfoFromMachO(path, arch.File)
+			archSet[sliceInfo.Arch] = struct{}{}
+			for _, sym := range sliceInfo.Symbols {
+				if _, seen := seenSyms[sym]; seen {
+					continue
+				}
+				seenSyms[sym] = struct{}{}
+				info.Symbols = append(info.Symbols, sym)
+			}
+			for _, lib := range sliceInfo.ImportedLibs {
+				if _, seen := seenLibs[lib]; seen {
+					continue
+				}
+				seenLibs[lib] = struct{}{}
+				info.ImportedLibs = append(info.ImportedLibs, lib)
+			}
+			if info.BuildID == "" && sliceInfo.BuildID != "" {
+				info.BuildID = sliceInfo.BuildID
+			}
+		}
+		arches := make([]string, 0, len(archSet))
+		for arch := range archSet {
+			arches = append(arches, arch)
+		}
+		slices.Sort(arches)
+		info.Arch = strings.Join(arches, ",")
+		return info, nil
 	}
 
 	f, err := macho.Open(path)
@@ -154,10 +187,10 @@ func parseMachO(path string) (*BinaryInfo, error) {
 		return nil, fmt.Errorf("binaryscan: parsing Mach-O %s: %w", path, err)
 	}
 	defer f.Close()
-	return binaryInfoFromMachO(path, f)
+	return binaryInfoFromMachO(path, f), nil
 }
 
-func binaryInfoFromMachO(path string, f *macho.File) (*BinaryInfo, error) {
+func binaryInfoFromMachO(path string, f *macho.File) *BinaryInfo {
 	info := &BinaryInfo{Path: path, Format: "macho", Arch: f.Cpu.String()}
 
 	if f.Symtab != nil {
@@ -170,9 +203,13 @@ func binaryInfoFromMachO(path string, f *macho.File) (*BinaryInfo, error) {
 		if dylib, ok := l.(*macho.Dylib); ok {
 			info.ImportedLibs = append(info.ImportedLibs, dylib.Name)
 		}
+		raw := l.Raw()
+		if len(raw) >= 24 && f.ByteOrder.Uint32(raw[0:4]) == 0x1b {
+			info.BuildID = hex.EncodeToString(raw[8:24])
+		}
 	}
 
-	return info, nil
+	return info
 }
 
 // parsePE extracts the COFF symbol table and import directory entries from a PE binary.

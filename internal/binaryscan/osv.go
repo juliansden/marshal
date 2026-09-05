@@ -6,9 +6,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
+
+	"github.com/marshal-security/marshal/internal/findings"
 )
 
 // osvAPIBaseURL is overridable in tests to point at a mock server.
@@ -78,7 +84,7 @@ type osvBatchResponse struct {
 func (c *OSVClient) QueryLibraries(ctx context.Context, matches []LibraryMatch) (map[string][]OSVVuln, error) {
 	versioned := make([]LibraryMatch, 0, len(matches))
 	for _, m := range matches {
-		if m.Version != "" {
+		if m.Version != "" && m.Signature.OSVEcosystem != "" && m.Signature.OSVPackage != "" {
 			versioned = append(versioned, m)
 		}
 	}
@@ -96,6 +102,9 @@ func (c *OSVClient) QueryLibraries(ctx context.Context, matches []LibraryMatch) 
 
 	batchResp, err := c.queryBatchWithRetry(ctx, req)
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+			return nil, err
+		}
 		// Degrade gracefully: return no CVE enrichment rather than failing the scan.
 		return nil, nil //nolint:nilerr
 	}
@@ -106,19 +115,131 @@ func (c *OSVClient) QueryLibraries(ctx context.Context, matches []LibraryMatch) 
 			continue
 		}
 		for _, v := range batchResp.Results[i].Vulns {
-			severity := ""
-			if len(v.Severity) > 0 {
-				severity = v.Severity[0].Score
-			}
 			results[m.Signature.Name] = append(results[m.Signature.Name], OSVVuln{
 				ID:       v.ID,
 				Summary:  v.Summary,
 				Aliases:  v.Aliases,
-				Severity: severity,
+				Severity: severityFromOSV(v.Severity),
 			})
 		}
 	}
 	return results, nil
+}
+
+func severityFromOSV(entries []struct {
+	Type  string `json:"type"`
+	Score string `json:"score"`
+}) string {
+	for _, entry := range entries {
+		score := strings.TrimSpace(entry.Score)
+		if score == "" {
+			continue
+		}
+		if n, err := strconv.ParseFloat(score, 64); err == nil {
+			return severityLabelFromCVSS(n)
+		}
+		switch strings.ToUpper(strings.TrimSpace(entry.Type)) {
+		case "CVSS_V3", "CVSS_V3.0", "CVSS_V3.1":
+			if n, ok := parseCVSSv3Vector(score); ok {
+				return severityLabelFromCVSS(n)
+			}
+		}
+	}
+	return string(findings.SeverityUnknown)
+}
+
+func severityLabelFromCVSS(score float64) string {
+	switch {
+	case score >= 9.0:
+		return string(findings.SeverityCritical)
+	case score >= 7.0:
+		return string(findings.SeverityHigh)
+	case score >= 4.0:
+		return string(findings.SeverityMedium)
+	case score > 0:
+		return string(findings.SeverityLow)
+	default:
+		return string(findings.SeverityUnknown)
+	}
+}
+
+func parseCVSSv3Vector(vector string) (float64, bool) {
+	v := strings.TrimPrefix(strings.TrimSpace(vector), "CVSS:3.0/")
+	v = strings.TrimPrefix(v, "CVSS:3.1/")
+	parts := strings.Split(v, "/")
+	metrics := map[string]string{}
+	for _, part := range parts {
+		kv := strings.SplitN(part, ":", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		metrics[kv[0]] = kv[1]
+	}
+
+	av, ok := map[string]float64{"N": 0.85, "A": 0.62, "L": 0.55, "P": 0.20}[metrics["AV"]]
+	if !ok {
+		return 0, false
+	}
+	ac, ok := map[string]float64{"L": 0.77, "H": 0.44}[metrics["AC"]]
+	if !ok {
+		return 0, false
+	}
+	ui, ok := map[string]float64{"N": 0.85, "R": 0.62}[metrics["UI"]]
+	if !ok {
+		return 0, false
+	}
+	scope, ok := metrics["S"]
+	if !ok {
+		return 0, false
+	}
+
+	var pr float64
+	switch scope {
+	case "U":
+		pr, ok = map[string]float64{"N": 0.85, "L": 0.62, "H": 0.27}[metrics["PR"]]
+	case "C":
+		pr, ok = map[string]float64{"N": 0.85, "L": 0.68, "H": 0.50}[metrics["PR"]]
+	default:
+		ok = false
+	}
+	if !ok {
+		return 0, false
+	}
+
+	c, ok := map[string]float64{"H": 0.56, "L": 0.22, "N": 0}[metrics["C"]]
+	if !ok {
+		return 0, false
+	}
+	i, ok := map[string]float64{"H": 0.56, "L": 0.22, "N": 0}[metrics["I"]]
+	if !ok {
+		return 0, false
+	}
+	a, ok := map[string]float64{"H": 0.56, "L": 0.22, "N": 0}[metrics["A"]]
+	if !ok {
+		return 0, false
+	}
+
+	iscBase := 1 - ((1 - c) * (1 - i) * (1 - a))
+	var impact float64
+	switch scope {
+	case "U":
+		impact = 6.42 * iscBase
+	case "C":
+		impact = 7.52*(iscBase-0.029) - 3.25*math.Pow(iscBase-0.02, 15)
+	}
+	if impact <= 0 {
+		return 0, true
+	}
+
+	exploitability := 8.22 * av * ac * pr * ui
+	base := impact + exploitability
+	if scope == "C" {
+		base *= 1.08
+	}
+	if base > 10 {
+		base = 10
+	}
+	return math.Ceil(base*10) / 10, true
 }
 
 func (c *OSVClient) queryBatchWithRetry(ctx context.Context, req osvBatchRequest) (*osvBatchResponse, error) {

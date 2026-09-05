@@ -18,9 +18,9 @@ This roadmap outlines the planned development phases. Each phase is designed to 
   - [x] Implement JSON marshaling/unmarshaling validation for `Location`.
 
 - **`internal/binaryscan/parser.go`**
-  - [x] Implement ELF parser using `debug/elf` to extract embedded symbol tables, `.comment` sections, and build IDs.
+  - [ ] Implement ELF parser using `debug/elf` to extract embedded symbol tables, `.comment` sections, and build IDs.
   - [x] Implement Mach-O parser using `debug/macho` to inspect load commands and dynamic symbol tables (including fat/universal binaries).
-  - [x] Implement PE parser using `debug/pe` to extract COFF headers and export/import directories.
+  - [ ] Implement PE parser using `debug/pe` to extract COFF headers and export/import directories.
 
 - **`internal/binaryscan/fingerprint.go`**
   - [x] Implement static library fingerprinting algorithm (matching symbol name sets against known static lib signatures).

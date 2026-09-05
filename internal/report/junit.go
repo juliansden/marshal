@@ -2,6 +2,7 @@ package report
 
 import (
 	"encoding/xml"
+	"fmt"
 	"io"
 
 	"github.com/marshal-security/marshal/internal/findings"
@@ -53,8 +54,16 @@ func (junitExporter) Export(w io.Writer, list []findings.Finding) error {
 			Failures: len(engineFindings),
 		}
 		for _, f := range engineFindings {
+			testcaseName := f.Location.String()
+			if f.ID != "" {
+				testcaseName = fmt.Sprintf("%s [%s]", testcaseName, f.ID)
+			} else if f.CVE != "" {
+				testcaseName = fmt.Sprintf("%s [%s]", testcaseName, f.CVE)
+			} else {
+				testcaseName = fmt.Sprintf("%s [%s]", testcaseName, f.Title)
+			}
 			suite.Cases = append(suite.Cases, junitTestCase{
-				Name: f.Location.String(),
+				Name: testcaseName,
 				Failure: &junitFailure{
 					Message: f.Title,
 					Type:    string(f.Severity),
