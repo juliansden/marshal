@@ -1,6 +1,6 @@
 # Marshal
 
-[![CI](https://github.com/marshal-security/marshal/actions/workflows/ci.yml/badge.svg)](https://github.com/marshal-security/marshal/actions/workflows/ci.yml)
+[![CI](https://github.com/juliansden/marshal/actions/workflows/ci.yml/badge.svg)](https://github.com/juliansden/marshal/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/Go-1.22%2B-00ADD8.svg)](https://go.dev/)
 
@@ -22,31 +22,30 @@ Marshal solves this with three key innovations:
 
 ## Architecture Overview
 
-```
- ┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐
- │ Binary BCA Engine │    │  Semgrep Adapter  │    │    ZAP Adapter    │
- │   (ELF/Mach-O/PE) │    │      (SAST)       │    │      (DAST)       │
- └─────────┬─────────┘    └─────────┬─────────┘    └─────────┬─────────┘
-           │                        │                        │
-           └──────────────────┬─────┴────────────────────────┘
-                              ▼
-                 ┌──────────────────────────┐
-                 │  Unified Finding Schema  │
-                 └────────────┬─────────────┘
-                              ▼
-                 ┌──────────────────────────┐
-                 │    Correlation Layer     │
-                 └────────────┬─────────────┘
-                              ▼
-                 ┌──────────────────────────┐
-                 │ Opt-in LLM Reachability  │ (Optional / Opt-in)
-                 │     Exploit Triage       │
-                 └────────────┬─────────────┘
-                              ▼
-                 ┌──────────────────────────┐
-                 │     Exporters & SARIF    │ (GitHub Code Scanning /
-                 │  (SARIF / JSON / JUnit)  │  VS Code Integration)
-                 └──────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Inputs ["1. Detection Engines"]
+        BCA["Binary Composition Analysis<br/><i>(ELF, Mach-O, PE)</i>"]
+        SAST["Semgrep Adapter<br/><i>(SAST - SARIF/JSON)</i>"]
+        DAST["ZAP Adapter<br/><i>(DAST - Endpoint/URL)</i>"]
+    end
+
+    subgraph Core ["2. Core Pipeline"]
+        Schema["Normalized Finding Schema"]
+        Correlate["Correlation & Deduplication Layer"]
+        Triage["Opt-in LLM Reachability Triage<br/><i>(Exploitability Assessment)</i>"]
+    end
+
+    subgraph Outputs ["3. Exporters"]
+        SARIF["SARIF Exporter<br/><i>(GitHub / VS Code)</i>"]
+        JSON["JSON Exporter"]
+        JUnit["JUnit XML Exporter"]
+    end
+
+    Inputs --> Schema
+    Schema --> Correlate
+    Correlate --> Triage
+    Triage --> Outputs
 ```
 
 ---
@@ -58,19 +57,19 @@ Marshal solves this with three key innovations:
 ### Via Shell Script (Recommended)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/marshal-security/marshal/main/install.sh | sh
+curl -sSL https://raw.githubusercontent.com/juliansden/marshal/main/install.sh | sh
 ```
 
 ### Via Homebrew (macOS / Linux)
 
 ```bash
-brew install marshal-security/tap/marshal
+brew install juliansden/tap/marshal
 ```
 
 ### Via Go Install
 
 ```bash
-go install github.com/marshal-security/marshal/cmd/marshal@latest
+go install github.com/juliansden/marshal/cmd/marshal@latest
 ```
 
 ---
