@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.2](https://github.com/juliansden/marshal/compare/v0.1.1...v0.1.2) (2026-09-05)
+
+
+### Features
+
+* implement Phase 1 BCA engine, finding schema, and report exporters ([b6e0f63](https://github.com/juliansden/marshal/commit/b6e0f63205176cf28e62f00e97bbf20e2a3fec3c))
+
+
+### Bug Fixes
+
+* address PR review thread defects ([0669225](https://github.com/juliansden/marshal/commit/066922527892e1e8833ad09e38a6677f04583bd5))
+
 ## [0.1.1](https://github.com/juliansden/marshal/compare/v0.1.0...v0.1.1) (2026-09-05)
 
 
