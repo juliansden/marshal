@@ -2,6 +2,7 @@
 package report
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/marshal-security/marshal/internal/findings"
@@ -22,7 +23,15 @@ type Exporter interface {
 }
 
 // NewExporter returns an Exporter implementation for the given format.
-func NewExporter(fmt Format) (Exporter, error) {
-	// TODO: Phase 1 (SARIF/JSON/JUnit exporters)
-	return nil, nil
+func NewExporter(format Format) (Exporter, error) {
+	switch format {
+	case FormatSARIF:
+		return sarifExporter{}, nil
+	case FormatJSON:
+		return jsonExporter{}, nil
+	case FormatJUnit:
+		return junitExporter{}, nil
+	default:
+		return nil, fmt.Errorf("report: unsupported format %q", format)
+	}
 }

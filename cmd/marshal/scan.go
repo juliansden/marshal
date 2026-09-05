@@ -2,8 +2,12 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/marshal-security/marshal/internal/binaryscan"
+	"github.com/marshal-security/marshal/internal/report"
 )
 
 var (
@@ -24,17 +28,32 @@ and optionally performs LLM-based reachability triage.`,
 			target = args[0]
 		}
 
-		cmd.Printf("Marshal security scan initiated for target: %s\n", target)
-		cmd.Printf("Output format: %s\n", formatFlag)
-		if enableTriage {
-			cmd.Println("LLM Reachability Triage: Enabled (Opt-in)")
-		} else {
-			cmd.Println("LLM Reachability Triage: Disabled (Default)")
+		exporter, err := report.NewExporter(report.Format(formatFlag))
+		if err != nil {
+			return err
 		}
 
-		// Skeleton notice for v1 scaffold
-		fmt.Println("Scan engine initialized. Run phase components will execute here.")
-		return nil
+		scanner := binaryscan.NewScanner()
+		results, err := scanner.ScanTarget(cmd.Context(), target)
+		if err != nil {
+			return fmt.Errorf("scan failed: %w", err)
+		}
+
+		if enableTriage {
+			cmd.Println("LLM Reachability Triage: Enabled (Opt-in) -- not yet implemented, findings unmodified")
+		}
+
+		out := cmd.OutOrStdout()
+		if outputFlag != "" {
+			f, err := os.Create(outputFlag)
+			if err != nil {
+				return fmt.Errorf("creating output file: %w", err)
+			}
+			defer f.Close()
+			out = f
+		}
+
+		return exporter.Export(out, results)
 	},
 }
 

@@ -1,6 +1,9 @@
 package findings
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -86,6 +89,54 @@ func (l Location) String() string {
 	}
 }
 
+// locationAlias avoids infinite recursion when delegating to the default JSON codec.
+type locationAlias Location
+
+// MarshalJSON rejects Locations whose Type doesn't match the populated file/URL payload.
+func (l Location) MarshalJSON() ([]byte, error) {
+	if err := l.validate(); err != nil {
+		return nil, err
+	}
+	return json.Marshal(locationAlias(l))
+}
+
+// UnmarshalJSON rejects Locations whose Type doesn't match the populated file/URL payload.
+func (l *Location) UnmarshalJSON(data []byte) error {
+	var alias locationAlias
+	if err := json.Unmarshal(data, &alias); err != nil {
+		return err
+	}
+	loc := Location(alias)
+	if err := loc.validate(); err != nil {
+		return err
+	}
+	*l = loc
+	return nil
+}
+
+// validate ensures exactly the location payload matching Type is populated.
+func (l Location) validate() error {
+	switch l.Type {
+	case LocationTypeFile:
+		if l.File == nil {
+			return fmt.Errorf("findings: location type %q requires a non-nil file location", l.Type)
+		}
+		if l.URL != nil {
+			return fmt.Errorf("findings: location type %q must not set url location", l.Type)
+		}
+	case LocationTypeURL:
+		if l.URL == nil {
+			return fmt.Errorf("findings: location type %q requires a non-nil url location", l.Type)
+		}
+		if l.File != nil {
+			return fmt.Errorf("findings: location type %q must not set file location", l.Type)
+		}
+	default:
+		return fmt.Errorf("findings: unknown location type %q", l.Type)
+	}
+	return nil
+}
+
 // TriageVerdict defines the output of the LLM-based reachability/exploitability evaluation (Phase 5).
 type TriageVerdict string
 
@@ -130,6 +181,24 @@ func (f Finding) String() string {
 		cveStr = fmt.Sprintf(" [%s]", f.CVE)
 	}
 	return fmt.Sprintf("[%s][%s]%s %s at %s", f.Engine, f.Severity, cveStr, f.Title, f.Location.String())
+}
+
+// ComputeFingerprint returns a stable SHA-256 hash of the finding's location, rule/CVE
+// identifier, and normalized title, suitable for deduplication and correlation.
+func (f Finding) ComputeFingerprint() string {
+	ruleOrCVE := f.CVE
+	if ruleOrCVE == "" {
+		ruleOrCVE = f.RuleID
+	}
+	normalizedTitle := strings.ToLower(strings.TrimSpace(f.Title))
+
+	h := sha256.New()
+	h.Write([]byte(f.Location.String()))
+	h.Write([]byte{0})
+	h.Write([]byte(ruleOrCVE))
+	h.Write([]byte{0})
+	h.Write([]byte(normalizedTitle))
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // NormalizeSeverity returns a standardized severity string.
