@@ -50,15 +50,16 @@ This roadmap outlines the planned development phases. Each phase is designed to 
 ### Package & File-Level TODOs
 
 - **`internal/adapters/semgrep/parser.go`**
-  - [ ] Parse Semgrep native SARIF (`semgrep scan --sarif`) and JSON outputs (`semgrep scan --json`).
-  - [ ] Map Semgrep rule IDs, severity levels (`ERROR` -> `HIGH`, `WARNING` -> `MEDIUM`, `INFO` -> `LOW`), and CWE identifiers to `findings.Severity` and `findings.Finding`.
+  - [x] Parse Semgrep native SARIF (`semgrep scan --sarif`) and JSON outputs (`semgrep scan --json`).
+  - [x] Map Semgrep rule IDs, severity levels (`ERROR` -> `HIGH`, `WARNING` -> `MEDIUM`, `INFO` -> `LOW`), and CWE identifiers to `findings.Severity` and `findings.Finding`.
 
 - **`internal/adapters/semgrep/semgrep.go`**
   - [ ] Implement process execution wrapper to optional shell-out to `semgrep` CLI if raw input file is not directly provided.
-  - [ ] Implement `Adapter.ParseReport(ctx, reportBytes)` returning `[]findings.Finding` with `EngineSemgrep` and `LocationTypeFile`.
+  - [x] Implement `Adapter.ParseReport(ctx, reportBytes)` returning `[]findings.Finding` with `EngineSemgrep` and `LocationTypeFile`.
 
 - **`cmd/marshal/scan.go`**
-  - [ ] Add CLI flags `--semgrep-report <path>` and `--run-semgrep` to include SAST results in the scan pipeline.
+  - [x] Add CLI flag `--semgrep-report <path>` to include SAST results in the scan pipeline.
+  - [ ] Add `--run-semgrep` to execute Semgrep from the scan pipeline.
 
 ---
 
