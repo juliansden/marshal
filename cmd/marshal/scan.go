@@ -6,13 +6,16 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/marshal-security/marshal/internal/adapters/semgrep"
 	"github.com/marshal-security/marshal/internal/binaryscan"
+	"github.com/marshal-security/marshal/internal/findings"
 	"github.com/marshal-security/marshal/internal/report"
 )
 
 var (
 	formatFlag   string
 	outputFlag   string
+	semgrepFlag  string
 	enableTriage bool
 )
 
@@ -30,10 +33,29 @@ and optionally performs LLM-based reachability triage.`,
 			return err
 		}
 
-		scanner := binaryscan.NewScanner()
-		results, err := scanner.ScanTarget(cmd.Context(), target)
+		var results []findings.Finding
+		info, err := os.Stat(target)
 		if err != nil {
-			return fmt.Errorf("scan failed: %w", err)
+			return fmt.Errorf("stat target: %w", err)
+		}
+		if !info.IsDir() {
+			scanner := binaryscan.NewScanner()
+			results, err = scanner.ScanTarget(cmd.Context(), target)
+			if err != nil {
+				return fmt.Errorf("scan failed: %w", err)
+			}
+		}
+
+		if semgrepFlag != "" {
+			reportData, err := os.ReadFile(semgrepFlag)
+			if err != nil {
+				return fmt.Errorf("reading Semgrep report: %w", err)
+			}
+			semgrepFindings, err := semgrep.NewAdapter().ParseReport(cmd.Context(), reportData)
+			if err != nil {
+				return fmt.Errorf("parsing Semgrep report: %w", err)
+			}
+			results = append(results, semgrepFindings...)
 		}
 
 		if enableTriage {
@@ -59,6 +81,7 @@ and optionally performs LLM-based reachability triage.`,
 func init() {
 	scanCmd.Flags().StringVarP(&formatFlag, "format", "f", "sarif", "Output format (sarif, json, junit)")
 	scanCmd.Flags().StringVarP(&outputFlag, "output", "o", "", "Output file path (default: stdout)")
+	scanCmd.Flags().StringVar(&semgrepFlag, "semgrep-report", "", "Read Semgrep SARIF or JSON report from this path")
 	scanCmd.Flags().BoolVar(&enableTriage, "triage", false, "Enable opt-in LLM reachability and exploitability triage")
 
 	rootCmd.AddCommand(scanCmd)

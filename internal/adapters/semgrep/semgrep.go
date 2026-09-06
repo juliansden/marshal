@@ -4,6 +4,7 @@ package semgrep
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/marshal-security/marshal/internal/findings"
 )
@@ -17,7 +18,23 @@ func NewAdapter() *Adapter {
 }
 
 // ParseReport converts raw Semgrep SARIF/JSON output into unified Findings.
-// TODO: Phase 2 implementation.
 func (a *Adapter) ParseReport(ctx context.Context, reportData []byte) ([]findings.Finding, error) {
-	return nil, nil
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	format, err := detectFormat(reportData)
+	if err != nil {
+		return nil, err
+	}
+	switch format {
+	case "sarif":
+		return ParseSARIF(reportData)
+	case "json":
+		return ParseJSON(reportData)
+	default:
+		return nil, fmt.Errorf("unsupported Semgrep report format %q", format)
+	}
 }
