@@ -20,8 +20,9 @@ var (
 )
 
 var scanCmd = &cobra.Command{
-	Use:   "scan <target>",
-	Short: "Run security analysis on target binaries, codebases, or reports",
+	Use:     "inspect <target>",
+	Aliases: []string{"scan"},
+	Short:   "Run security analysis on target binaries, codebases, or reports",
 	Long: `Scan inspects compiled binaries, source code, or adapter inputs, correlates findings,
 and optionally performs LLM-based reachability triage.`,
 	Args: cobra.ExactArgs(1),
@@ -43,6 +44,11 @@ and optionally performs LLM-based reachability triage.`,
 			results, err = scanner.ScanTarget(cmd.Context(), target)
 			if err != nil {
 				return fmt.Errorf("scan failed: %w", err)
+			}
+			if len(results) == 0 && semgrepFlag == "" {
+				if _, err := fmt.Fprintln(cmd.ErrOrStderr(), "Binary scan completed: no supported library signatures detected"); err != nil {
+					return fmt.Errorf("writing scan status: %w", err)
+				}
 			}
 		}
 
@@ -78,11 +84,80 @@ and optionally performs LLM-based reachability triage.`,
 	},
 }
 
+var musterCmd = &cobra.Command{
+	Use:   "muster <binary>",
+	Short: "Run binary composition analysis on a compiled binary",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		target := args[0]
+		info, err := os.Stat(target)
+		if err != nil {
+			return fmt.Errorf("stat binary: %w", err)
+		}
+		if info.IsDir() {
+			return fmt.Errorf("muster target must be a file, got directory %q", target)
+		}
+
+		results, err := binaryscan.NewScanner().ScanTarget(cmd.Context(), target)
+		if err != nil {
+			return fmt.Errorf("binary scan failed: %w", err)
+		}
+		if len(results) == 0 {
+			if _, err := fmt.Fprintln(cmd.ErrOrStderr(), "Binary scan completed: no supported library signatures detected"); err != nil {
+				return fmt.Errorf("writing scan status: %w", err)
+			}
+		}
+		return exportFindings(cmd, results)
+	},
+}
+
+var scryCmd = &cobra.Command{
+	Use:   "scry <semgrep-report>",
+	Short: "Parse a Semgrep SARIF or JSON report",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		reportData, err := os.ReadFile(args[0])
+		if err != nil {
+			return fmt.Errorf("reading Semgrep report: %w", err)
+		}
+		results, err := semgrep.NewAdapter().ParseReport(cmd.Context(), reportData)
+		if err != nil {
+			return fmt.Errorf("parsing Semgrep report: %w", err)
+		}
+		return exportFindings(cmd, results)
+	},
+}
+
+func exportFindings(cmd *cobra.Command, results []findings.Finding) error {
+	exporter, err := report.NewExporter(report.Format(formatFlag))
+	if err != nil {
+		return err
+	}
+	out := cmd.OutOrStdout()
+	if outputFlag != "" {
+		f, err := os.Create(outputFlag)
+		if err != nil {
+			return fmt.Errorf("creating output file: %w", err)
+		}
+		defer f.Close()
+		out = f
+	}
+	return exporter.Export(out, results)
+}
+
+func addOutputFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVarP(&formatFlag, "format", "f", "sarif", "Output format (sarif, json, junit)")
+	cmd.Flags().StringVarP(&outputFlag, "output", "o", "", "Output file path (default: stdout)")
+}
+
 func init() {
-	scanCmd.Flags().StringVarP(&formatFlag, "format", "f", "sarif", "Output format (sarif, json, junit)")
-	scanCmd.Flags().StringVarP(&outputFlag, "output", "o", "", "Output file path (default: stdout)")
+	addOutputFlags(scanCmd)
 	scanCmd.Flags().StringVar(&semgrepFlag, "semgrep-report", "", "Read Semgrep SARIF or JSON report from this path")
 	scanCmd.Flags().BoolVar(&enableTriage, "triage", false, "Enable opt-in LLM reachability and exploitability triage")
+	addOutputFlags(musterCmd)
+	addOutputFlags(scryCmd)
 
 	rootCmd.AddCommand(scanCmd)
+	rootCmd.AddCommand(musterCmd)
+	rootCmd.AddCommand(scryCmd)
 }

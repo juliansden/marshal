@@ -81,22 +81,29 @@ go install github.com/juliansden/marshal/cmd/marshal@latest
 Scan a compiled executable binary for statically linked vulnerabilities and output SARIF:
 
 ```bash
-marshal scan ./bin/myapp --format sarif --output results.sarif
+marshal muster ./bin/myapp --format sarif --output results.sarif
 ```
 
-### 2. Ingest SAST & DAST Reports into Unified Scan
+### 2. Parse a Semgrep Report
 
-Combine Semgrep SAST and ZAP DAST scan results into a single correlated output:
+Parse an existing Semgrep SARIF or JSON report:
 
 ```bash
-marshal scan . \
+marshal scry semgrep.sarif --format json
+```
+
+### 3. Unified Inspection
+
+Combine the applicable findings into one report. `scan` remains an alias for `inspect`:
+
+```bash
+marshal inspect . \
   --semgrep-report semgrep.sarif \
-  --zap-report zap-report.json \
   --format sarif \
   --output correlated-findings.sarif
 ```
 
-### 3. Run with Opt-in LLM Reachability Triage
+### 4. Run with Opt-in LLM Reachability Triage
 
 Enable AI-powered reachability triage to downgrade unexploitable false positives:
 
