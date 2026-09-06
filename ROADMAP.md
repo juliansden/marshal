@@ -24,7 +24,8 @@ This roadmap outlines the planned development phases. Each phase is designed to 
 
 - **`internal/binaryscan/fingerprint.go`**
   - [x] Implement static library fingerprinting algorithm (matching symbol name sets against known static lib signatures).
-  - [x] Integrate CVE lookup via live queries to the public [OSV.dev](https://osv.dev) API (`api.osv.dev/v1/querybatch`), scoped per detected library + resolved version. Queries are skipped when a version can't be determined, to avoid flooding results with a package's entire historical CVE list. *(Future enhancement: optional local OSV mirror for fully offline/air-gapped scanning.)*
+  - [x] Detect the linked library version via embedded version-banner strings each library compiles in verbatim (e.g. OpenSSL's `OpenSSL 1.1.1f  31 Mar 2020`, zlib's `deflate 1.2.11 Copyright ...`, libcurl's `libcurl/7.68.0`, libpng's `libpng version 1.6.37 ...`), rather than fabricated "version marker" symbols.
+  - [x] Integrate CVE lookup via NIST NVD's CPE-based API (`services.nvd.nist.gov/rest/json/cves/2.0?cpeName=...`), keyed by `vendor:product:version` per detected library. NVD's CPE model was chosen over OSV.dev because OSV has no ecosystem for "generic statically-linked C library by upstream version" — only distro package ecosystems (Debian/Alpine) whose versioning doesn't line up with upstream semver, which previously produced no results or inaccurate/unscoped matches. Requests respect NVD's published rate limits (5/30s unauthenticated, 50/30s with `MARSHAL_NVD_API_KEY` set) and degrade gracefully (skip enrichment, don't fail the scan) on network errors. Queries are skipped entirely when a version can't be determined.
 
 - **`internal/binaryscan/binaryscan.go`**
   - [x] Wire parsers and fingerprinting into `Scanner.ScanTarget(ctx, binaryPath)`.
