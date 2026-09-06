@@ -7,6 +7,9 @@ dist/
 *.so
 *.dylib
 
+# Built test fixtures (regenerate via build.sh in each testdata/ subdir)
+internal/binaryscan/testdata/*/fixture_*
+
 # Test artifacts
 *.test
 *.out
