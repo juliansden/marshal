@@ -10,42 +10,35 @@ import (
 
 func TestScanTargetEndToEnd(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var req osvBatchRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Fatalf("decoding request: %v", err)
+		if got := r.URL.Query().Get("cpeName"); got != "cpe:2.3:a:openssl:openssl:1.1.1f:*:*:*:*:*:*:*" {
+			t.Fatalf("unexpected cpeName query: %s", got)
 		}
-
-		results := make([]osvBatchResult, len(req.Queries))
-		for i, q := range req.Queries {
-			if q.Package.Name == "openssl" {
-				results[i] = osvBatchResult{
-					Vulns: []osvVulnResponse{
-						{ID: "OSV-2021-1234", Summary: "Buffer overflow", Aliases: []string{"CVE-2021-1234"}},
-					},
-				}
-			}
+		resp := nvdResponse{
+			Vulnerabilities: []nvdVulnerability{
+				{CVE: nvdCVE{
+					ID:           "CVE-2021-1234",
+					Descriptions: []nvdDescription{{Lang: "en", Value: "Buffer overflow"}},
+					Metrics:      nvdMetrics{CvssMetricV31: []nvdCVSSMetric{{CVSSData: nvdCVSSData{BaseSeverity: "HIGH"}}}},
+				}},
+			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(osvBatchResponse{Results: results}); err != nil {
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			t.Fatalf("encoding response: %v", err)
 		}
 	}))
 	defer server.Close()
 
 	scanner := &Scanner{
-		osvClient: &OSVClient{httpClient: server.Client(), baseURL: server.URL, maxRetries: 1},
+		nvdClient: &NVDClient{httpClient: server.Client(), baseURL: server.URL, maxRetries: 1, limiter: newRateLimiter(1000, 0)},
 		parseBinary: func(path string) (*BinaryInfo, error) {
 			return &BinaryInfo{Path: path, Format: "elf", Arch: "amd64"}, nil
 		},
 		matchLibrary: func(BinaryInfo) []LibraryMatch {
 			return []LibraryMatch{
 				{
-					Signature: librarySignature{
-						Name:         "openssl",
-						OSVEcosystem: "OSS-Fuzz",
-						OSVPackage:   "openssl",
-					},
-					Version: "1.1.1",
+					Signature: librarySignature{Name: "openssl", CPEVendor: "openssl", CPEProduct: "openssl"},
+					Version:   "1.1.1f",
 				},
 			}
 		},
@@ -59,7 +52,10 @@ func TestScanTargetEndToEnd(t *testing.T) {
 		t.Fatalf("expected 1 finding, got %d", len(results))
 	}
 	if results[0].CVE != "CVE-2021-1234" {
-		t.Fatalf("expected CVE alias, got %q", results[0].CVE)
+		t.Fatalf("expected CVE-2021-1234, got %q", results[0].CVE)
+	}
+	if results[0].Severity != "HIGH" {
+		t.Fatalf("expected HIGH severity, got %q", results[0].Severity)
 	}
 }
 
@@ -79,7 +75,7 @@ func TestScanTargetNoMatchesReturnsNil(t *testing.T) {
 
 func TestScanTargetReportsUnenrichedMatch(t *testing.T) {
 	scanner := &Scanner{
-		osvClient: &OSVClient{httpClient: http.DefaultClient, baseURL: "http://127.0.0.1:0", maxRetries: 0},
+		nvdClient: &NVDClient{httpClient: http.DefaultClient, baseURL: "http://127.0.0.1:0", maxRetries: 0, limiter: newRateLimiter(1000, 0)},
 		parseBinary: func(path string) (*BinaryInfo, error) {
 			return &BinaryInfo{Path: path, Format: "elf", Arch: "amd64"}, nil
 		},
@@ -97,5 +93,60 @@ func TestScanTargetReportsUnenrichedMatch(t *testing.T) {
 	}
 	if results[0].Severity != "INFO" {
 		t.Fatalf("expected INFO severity, got %s", results[0].Severity)
+	}
+}
+
+func TestScanTargetHandlesNilNVDClient(t *testing.T) {
+	scanner := &Scanner{
+		parseBinary: func(path string) (*BinaryInfo, error) {
+			return &BinaryInfo{Path: path, Format: "elf", Arch: "amd64"}, nil
+		},
+		matchLibrary: func(BinaryInfo) []LibraryMatch {
+			return []LibraryMatch{{Signature: librarySignature{Name: "zlib"}}}
+		},
+	}
+
+	results, err := scanner.ScanTarget(context.Background(), "fixture.bin")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(results))
+	}
+}
+
+func TestScanTargetReportsCleanEnrichedLibrary(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(nvdResponse{}); err != nil {
+			t.Fatalf("encoding response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	scanner := &Scanner{
+		nvdClient: &NVDClient{httpClient: server.Client(), baseURL: server.URL, maxRetries: 0, limiter: newRateLimiter(1000, 0)},
+		parseBinary: func(path string) (*BinaryInfo, error) {
+			return &BinaryInfo{Path: path, Format: "elf", Arch: "amd64"}, nil
+		},
+		matchLibrary: func(BinaryInfo) []LibraryMatch {
+			return []LibraryMatch{
+				{
+					Signature: librarySignature{Name: "openssl", CPEVendor: "openssl", CPEProduct: "openssl"},
+					Version:   "1.1.1f",
+				},
+			}
+		},
+	}
+
+	results, err := scanner.ScanTarget(context.Background(), "fixture.bin")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(results))
+	}
+	if got, want := results[0].Description, "Detected statically-linked library; no known CVEs were returned by NVD for this version."; got != want {
+		t.Fatalf("unexpected description: got %q want %q", got, want)
 	}
 }

@@ -10,7 +10,7 @@ on:
 jobs:
   lint-pr-title:
     name: Validate PR Title (Conventional Commits)
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && contains(fromJson('["opened","edited","reopened"]'), github.event.action)
     runs-on: ubuntu-latest
     steps:
       - uses: amannn/action-semantic-pull-request@v5
