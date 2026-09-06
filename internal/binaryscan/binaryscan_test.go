@@ -60,16 +60,29 @@ func TestScanTargetEndToEnd(t *testing.T) {
 }
 
 func TestScanTargetNoMatchesReturnsNil(t *testing.T) {
-	scanner := NewScanner()
-
-	target := buildFixture(t, "linux", "amd64", "fixture_elf")
-
-	results, err := scanner.ScanTarget(context.Background(), target)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	tests := []struct {
+		name   string
+		goos   string
+		goarch string
+	}{
+		{name: "linux ELF", goos: "linux", goarch: "amd64"},
+		{name: "Windows PE", goos: "windows", goarch: "amd64"},
+		{name: "macOS Mach-O", goos: "darwin", goarch: "arm64"},
 	}
-	if len(results) != 0 {
-		t.Errorf("expected no findings for a binary with no known signatures, got %d", len(results))
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			scanner := NewScanner()
+			target := buildRealBinary(t, test.goos, test.goarch, "marshal-test-binary")
+
+			results, err := scanner.ScanTarget(context.Background(), target)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(results) != 0 {
+				t.Errorf("expected no findings for a binary with no known signatures, got %d", len(results))
+			}
+		})
 	}
 }
 

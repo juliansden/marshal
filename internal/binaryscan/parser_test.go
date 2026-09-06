@@ -8,10 +8,9 @@ import (
 	"testing"
 )
 
-// buildFixture cross-compiles a trivial Go program for the given GOOS/GOARCH
-// and returns the path to the resulting binary. Skips the test if the local
-// Go toolchain cannot cross-compile for the requested target.
-func buildFixture(t *testing.T, goos, goarch, outName string) string {
+// buildRealBinary cross-compiles a small executable for the requested target.
+// It skips the test when the local Go toolchain cannot build that target.
+func buildRealBinary(t *testing.T, goos, goarch, outName string) string {
 	t.Helper()
 
 	srcDir := t.TempDir()
@@ -44,7 +43,7 @@ func TestDetectFormatAndParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			path := buildFixture(t, tt.goos, tt.goarch, tt.outName)
+			path := buildRealBinary(t, tt.goos, tt.goarch, tt.outName)
 
 			format, err := detectFormat(path)
 			if err != nil {

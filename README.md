@@ -72,6 +72,28 @@ brew install juliansden/tap/marshal
 go install github.com/juliansden/marshal/cmd/marshal@latest
 ```
 
+Go installs the executable to `$(go env GOPATH)/bin`. Add that directory to your shell `PATH` once so `marshal` is available from any directory:
+
+```zsh
+echo 'export PATH="$(go env GOPATH)/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+marshal --help
+```
+
+### Shell Completion
+
+Completion is opt-in and shell-specific. It generates a script that lets your shell complete Marshal commands and flags when you press Tab; it does not install Marshal or modify your shell configuration by itself.
+
+For zsh, add the following after the `PATH` entry in `~/.zshrc`:
+
+```zsh
+autoload -Uz compinit
+compinit
+eval "$(marshal completion zsh)"
+```
+
+Open a new terminal, then try `marshal mu` followed by Tab. Cobra also supports `bash`, `fish`, and `powershell` through `marshal completion <shell>`.
+
 ---
 
 ## Quick Start & Usage Examples
@@ -115,6 +137,24 @@ marshal scan ./bin/myapp \
   --format json \
   --output triaged-findings.json
 ```
+
+---
+
+## Testing Binary Formats
+
+The binary scanner tests compile real, minimal executable files into Go-managed temporary directories at test time. The suite cross-compiles one binary for each supported format:
+
+- Linux `amd64` ELF
+- Windows `amd64` PE
+- macOS `arm64` Mach-O
+
+It verifies both format parsing and the `ScanTarget` path for each binary without committing generated executables to the repository or requiring a network request. Run the focused suite with:
+
+```bash
+go test ./internal/binaryscan
+```
+
+The `internal/binaryscan/testdata/synthetic_openssl` source remains available for manual end-to-end testing of an OpenSSL signature, but is not required for the automated suite.
 
 ---
 
