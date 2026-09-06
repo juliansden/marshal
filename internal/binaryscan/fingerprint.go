@@ -11,7 +11,9 @@ import (
 // extract its embedded version banner (if any), and how to identify it as a
 // CPE (vendor:product) for NVD vulnerability lookups.
 type librarySignature struct {
-	Name string
+	Name       string
+	Ecosystem  string
+	Confidence string
 	// CPEVendor and CPEProduct identify this library in NIST NVD's CPE
 	// dictionary (cpe:2.3:a:{vendor}:{product}:{version}), used for CVE lookups.
 	CPEVendor  string
@@ -32,6 +34,8 @@ type librarySignature struct {
 var knownSignatures = []librarySignature{
 	{
 		Name:           "openssl",
+		Ecosystem:      "c/c++",
+		Confidence:     "high",
 		CPEVendor:      "openssl",
 		CPEProduct:     "openssl",
 		SymbolMarkers:  []string{"SSL_CTX_new", "OPENSSL_init_ssl"},
@@ -39,6 +43,8 @@ var knownSignatures = []librarySignature{
 	},
 	{
 		Name:           "zlib",
+		Ecosystem:      "c/c++",
+		Confidence:     "high",
 		CPEVendor:      "zlib",
 		CPEProduct:     "zlib",
 		SymbolMarkers:  []string{"inflate", "deflate", "zlibVersion"},
@@ -46,6 +52,8 @@ var knownSignatures = []librarySignature{
 	},
 	{
 		Name:           "libcurl",
+		Ecosystem:      "c/c++",
+		Confidence:     "high",
 		CPEVendor:      "haxx",
 		CPEProduct:     "curl",
 		SymbolMarkers:  []string{"curl_easy_init", "curl_easy_perform"},
@@ -53,6 +61,8 @@ var knownSignatures = []librarySignature{
 	},
 	{
 		Name:           "libxml2",
+		Ecosystem:      "c/c++",
+		Confidence:     "high",
 		CPEVendor:      "xmlsoft",
 		CPEProduct:     "libxml2",
 		SymbolMarkers:  []string{"xmlParseDocument", "xmlReadMemory"},
@@ -60,10 +70,65 @@ var knownSignatures = []librarySignature{
 	},
 	{
 		Name:           "libpng",
+		Ecosystem:      "c/c++",
+		Confidence:     "high",
 		CPEVendor:      "libpng",
 		CPEProduct:     "libpng",
 		SymbolMarkers:  []string{"png_create_read_struct", "png_read_image"},
 		VersionPattern: regexp.MustCompile(`libpng version (\d+\.\d+\.\d+)`),
+	},
+	{
+		Name:           "sqlite",
+		Ecosystem:      "c/c++",
+		Confidence:     "high",
+		CPEVendor:      "sqlite",
+		CPEProduct:     "sqlite",
+		SymbolMarkers:  []string{"sqlite3_open", "sqlite3_prepare_v2", "sqlite3_step"},
+	},
+	{
+		Name:           "expat",
+		Ecosystem:      "c/c++",
+		Confidence:     "high",
+		CPEVendor:      "libexpat_project",
+		CPEProduct:     "libexpat",
+		SymbolMarkers:  []string{"XML_ParserCreate", "XML_Parse", "XML_ParserFree"},
+		VersionPattern: regexp.MustCompile(`expat(?: version)?[ /-](\d+\.\d+\.\d+)`),
+	},
+	{
+		Name:           "libssh2",
+		Ecosystem:      "c/c++",
+		Confidence:     "high",
+		CPEVendor:      "libssh2",
+		CPEProduct:     "libssh2",
+		SymbolMarkers:  []string{"libssh2_session_init_ex", "libssh2_userauth_password", "libssh2_session_handshake"},
+		VersionPattern: regexp.MustCompile(`libssh2[_ /-](\d+\.\d+\.\d+)`),
+	},
+	{
+		Name:           "pcre2",
+		Ecosystem:      "c/c++",
+		Confidence:     "high",
+		CPEVendor:      "pcre",
+		CPEProduct:     "pcre2",
+		SymbolMarkers:  []string{"pcre2_compile_8", "pcre2_match_8", "pcre2_match_data_create"},
+		VersionPattern: regexp.MustCompile(`PCRE2 (\d+\.\d+)`),
+	},
+	{
+		Name:           "libjpeg-turbo",
+		Ecosystem:      "c/c++",
+		Confidence:     "high",
+		CPEVendor:      "libjpeg-turbo",
+		CPEProduct:     "libjpeg-turbo",
+		SymbolMarkers:  []string{"jpeg_std_error", "jpeg_CreateDecompress", "jpeg_read_header"},
+		VersionPattern: regexp.MustCompile(`libjpeg-turbo version (\d+\.\d+\.\d+)`),
+	},
+	{
+		Name:           "libwebp",
+		Ecosystem:      "c/c++",
+		Confidence:     "high",
+		CPEVendor:      "google",
+		CPEProduct:     "libwebp",
+		SymbolMarkers:  []string{"WebPDecode", "WebPEncode", "WebPGetInfo"},
+		VersionPattern: regexp.MustCompile(`libwebp(?:\s+|/)(\d+\.\d+\.\d+)`),
 	},
 }
 

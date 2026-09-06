@@ -24,12 +24,18 @@ This roadmap outlines the planned development phases. Each phase is designed to 
 
 - **`internal/binaryscan/fingerprint.go`**
   - [x] Implement static library fingerprinting algorithm (matching symbol name sets against known static lib signatures).
+  - [x] Expand the signature registry with confidence and ecosystem metadata for additional libraries including SQLite, Expat, libssh2, PCRE2, libjpeg-turbo, and libwebp.
+  - [ ] Use imported shared-library names as a secondary detection source when symbol tables are absent or stripped.
+  - [ ] Add explicit confidence levels for symbol-based, import-based, and string-based matches.
+  - [ ] Expand the signature registry further only after each entry has reliable markers, version evidence, CPE mapping, and fixture coverage.
   - [x] Detect the linked library version via embedded version-banner strings each library compiles in verbatim (e.g. OpenSSL's `OpenSSL 1.1.1f  31 Mar 2020`, zlib's `deflate 1.2.11 Copyright ...`, libcurl's `libcurl/7.68.0`, libpng's `libpng version 1.6.37 ...`), rather than fabricated "version marker" symbols.
   - [x] Integrate CVE lookup via NIST NVD's CPE-based API (`services.nvd.nist.gov/rest/json/cves/2.0?cpeName=...`), keyed by `vendor:product:version` per detected library. NVD's CPE model was chosen over OSV.dev because OSV has no ecosystem for "generic statically-linked C library by upstream version" — only distro package ecosystems (Debian/Alpine) whose versioning doesn't line up with upstream semver, which previously produced no results or inaccurate/unscoped matches. Requests respect NVD's published rate limits (5/30s unauthenticated, 50/30s with `MARSHAL_NVD_API_KEY` set) and degrade gracefully (skip enrichment, don't fail the scan) on network errors. Queries are skipped entirely when a version can't be determined.
 
 - **`internal/binaryscan/binaryscan.go`**
   - [x] Wire parsers and fingerprinting into `Scanner.ScanTarget(ctx, binaryPath)`.
   - [x] Map detected vulnerable library symbols to `findings.Finding` instances with `EngineBinarySCA`.
+  - [ ] Report scan evidence and distinguish "no supported dependency detected" from "no vulnerabilities found".
+  - [ ] Add language-specific metadata detection for Go build information and high-confidence Rust binary evidence.
 
 - **`internal/report/sarif.go`**
   - [x] Implement SARIF v2.1.0 exporter (`OASIS SARIF` spec) converting `[]findings.Finding` to standard SARIF log format for GitHub Code Scanning / VS Code Problems panel integration.

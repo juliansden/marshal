@@ -77,6 +77,8 @@ func (s *Scanner) ScanTarget(ctx context.Context, targetPath string) ([]findings
 				},
 				Metadata: map[string]any{
 					"library":     match.Signature.Name,
+					"ecosystem":   match.Signature.Ecosystem,
+					"confidence":  match.Signature.Confidence,
 					"version":     match.Version,
 					"cve_id":      vuln.ID,
 					"cpe":         fmt.Sprintf("cpe:2.3:a:%s:%s:%s:*:*:*:*:*:*:*", match.Signature.CPEVendor, match.Signature.CPEProduct, match.Version),
@@ -110,6 +112,8 @@ func unmatchedLibraryFinding(targetPath string, info BinaryInfo, match LibraryMa
 		},
 		Metadata: map[string]any{
 			"library":     match.Signature.Name,
+			"ecosystem":   match.Signature.Ecosystem,
+			"confidence":  match.Signature.Confidence,
 			"version":     match.Version,
 			"cve_id":      "",
 			"binary_arch": info.Arch,

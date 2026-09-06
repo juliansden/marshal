@@ -132,3 +132,32 @@ func TestMatchSignaturesMissingBinaryLeavesVersionUndetermined(t *testing.T) {
 		t.Errorf("expected undetermined version when binary can't be read, got %q", matches[0].Version)
 	}
 }
+
+func TestMatchSignaturesDetectsAdditionalLibraries(t *testing.T) {
+	tests := []struct {
+		name    string
+		symbols []string
+	}{
+		{name: "sqlite", symbols: []string{"sqlite3_open", "sqlite3_prepare_v2", "sqlite3_step"}},
+		{name: "expat", symbols: []string{"XML_ParserCreate", "XML_Parse", "XML_ParserFree"}},
+		{name: "libssh2", symbols: []string{"libssh2_session_init_ex", "libssh2_userauth_password", "libssh2_session_handshake"}},
+		{name: "pcre2", symbols: []string{"pcre2_compile_8", "pcre2_match_8", "pcre2_match_data_create"}},
+		{name: "libjpeg-turbo", symbols: []string{"jpeg_std_error", "jpeg_CreateDecompress", "jpeg_read_header"}},
+		{name: "libwebp", symbols: []string{"WebPDecode", "WebPEncode", "WebPGetInfo"}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matches := MatchSignatures(BinaryInfo{Symbols: test.symbols})
+			if len(matches) != 1 {
+				t.Fatalf("expected one match, got %d", len(matches))
+			}
+			if matches[0].Signature.Name != test.name {
+				t.Fatalf("expected %s, got %s", test.name, matches[0].Signature.Name)
+			}
+			if matches[0].Signature.Confidence != "high" {
+				t.Fatalf("expected high confidence, got %q", matches[0].Signature.Confidence)
+			}
+		})
+	}
+}
