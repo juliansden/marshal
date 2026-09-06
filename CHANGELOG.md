@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.3](https://github.com/juliansden/marshal/compare/v0.1.2...v0.1.3) (2026-09-06)
+
+
+### Bug Fixes
+
+* address PR [#4](https://github.com/juliansden/marshal/issues/4) review thread issues ([b9ce69b](https://github.com/juliansden/marshal/commit/b9ce69ba1d0b56e684cd8d8dfdcf3e02d0689797))
+* replace inaccurate OSV.dev lookups with NVD CPE-based CVE enrichment ([bc73ac4](https://github.com/juliansden/marshal/commit/bc73ac4490873fab5a14f21ed2741a28516cd0c0))
+
 ## [0.1.2](https://github.com/juliansden/marshal/compare/v0.1.1...v0.1.2) (2026-09-05)
 
 
