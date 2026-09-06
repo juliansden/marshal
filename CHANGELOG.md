@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.4](https://github.com/juliansden/marshal/compare/v0.1.3...v0.1.4) (2026-09-06)
+
+
+### Features
+
+* begin phase 2 semgrep ingestion ([7846c7d](https://github.com/juliansden/marshal/commit/7846c7d9007d741c6260266bf362afae3daa82a3))
+* begin phase 2 semgrep ingestion ([739fb6a](https://github.com/juliansden/marshal/commit/739fb6af0540871d382dd34baeaa0a084e9d8a1a))
+
+
+### Bug Fixes
+
+* address semgrep review feedback ([39c59c9](https://github.com/juliansden/marshal/commit/39c59c904155a15f1c9390ac04fa773d850af30d))
+
 ## [0.1.3](https://github.com/juliansden/marshal/compare/v0.1.2...v0.1.3) (2026-09-06)
 
 
