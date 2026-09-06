@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/juliansden/marshal/compare/v0.1.4...v0.1.5) (2026-09-06)
+
+
+### Features
+
+* expand bca coverage and add themed commands ([fab22d5](https://github.com/juliansden/marshal/commit/fab22d57ebb64d3377b3eb219dab684d96907bec))
+
 ## [0.1.4](https://github.com/juliansden/marshal/compare/v0.1.3...v0.1.4) (2026-09-06)
 
 
