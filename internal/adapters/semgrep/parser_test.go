@@ -43,6 +43,20 @@ func TestParseSARIF(t *testing.T) {
 	}
 }
 
+func TestParseSARIFRejectsMultipleRuns(t *testing.T) {
+	report := []byte(`{
+  "version": "2.1.0",
+  "runs": [
+    {"tool": {"driver": {"rules": []}}, "results": []},
+    {"tool": {"driver": {"rules": []}}, "results": []}
+  ]
+}`)
+
+	if _, err := ParseSARIF(report); err == nil {
+		t.Fatal("expected multiple runs error")
+	}
+}
+
 func TestAdapterParseNativeJSON(t *testing.T) {
 	report := []byte(`{
   "results": [{
@@ -72,5 +86,16 @@ func TestAdapterParseNativeJSON(t *testing.T) {
 func TestParseReportRejectsUnsupportedInput(t *testing.T) {
 	if _, err := NewAdapter().ParseReport(context.Background(), []byte(`{"unexpected": true}`)); err == nil {
 		t.Fatal("expected unsupported format error")
+	}
+}
+
+func TestExtractCWEFiltersEmptyStrings(t *testing.T) {
+	got := extractCWE([]string{"CWE-79", "", "CWE-89"})
+	if len(got) != 2 || got[0] != "CWE-79" || got[1] != "CWE-89" {
+		t.Fatalf("unexpected CWE values: %+v", got)
+	}
+
+	if got := extractCWE([]string{""}); got != nil {
+		t.Fatalf("expected nil for empty CWE list, got %+v", got)
 	}
 }

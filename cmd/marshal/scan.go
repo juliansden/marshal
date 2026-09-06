@@ -38,7 +38,11 @@ and optionally performs LLM-based reachability triage.`,
 		if err != nil {
 			return fmt.Errorf("stat target: %w", err)
 		}
-		if !info.IsDir() {
+		if info.IsDir() {
+			if semgrepFlag == "" {
+				return fmt.Errorf("directory targets require --semgrep-report")
+			}
+		} else {
 			scanner := binaryscan.NewScanner()
 			results, err = scanner.ScanTarget(cmd.Context(), target)
 			if err != nil {

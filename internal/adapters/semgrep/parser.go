@@ -80,6 +80,9 @@ func ParseSARIF(data []byte) ([]findings.Finding, error) {
 	if len(report.Runs) == 0 {
 		return nil, fmt.Errorf("parse Semgrep SARIF: missing runs")
 	}
+	if len(report.Runs) > 1 {
+		return nil, fmt.Errorf("parse Semgrep SARIF: multiple runs are not supported")
+	}
 
 	run := report.Runs[0]
 	ruleProperties := make(map[string]map[string]any, len(run.Tool.Driver.Rules))
@@ -196,7 +199,16 @@ func extractCWE(value any) []string {
 		}
 		return cwe
 	case []string:
-		return value
+		cwe := value[:0]
+		for _, text := range value {
+			if text != "" {
+				cwe = append(cwe, text)
+			}
+		}
+		if len(cwe) == 0 {
+			return nil
+		}
+		return cwe
 	default:
 		return nil
 	}
