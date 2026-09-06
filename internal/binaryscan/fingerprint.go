@@ -84,7 +84,6 @@ var knownSignatures = []librarySignature{
 		CPEVendor:      "sqlite",
 		CPEProduct:     "sqlite",
 		SymbolMarkers:  []string{"sqlite3_open", "sqlite3_prepare_v2", "sqlite3_step"},
-		VersionPattern: regexp.MustCompile(`SQLite format 3`),
 	},
 	{
 		Name:           "expat",

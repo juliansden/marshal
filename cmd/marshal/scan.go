@@ -23,7 +23,7 @@ var scanCmd = &cobra.Command{
 	Use:     "inspect <target>",
 	Aliases: []string{"scan"},
 	Short:   "Run security analysis on target binaries, codebases, or reports",
-	Long: `Scan inspects compiled binaries, source code, or adapter inputs, correlates findings,
+	Long: `Inspect analyzes compiled binaries, source code, or adapter inputs, correlates findings,
 and optionally performs LLM-based reachability triage.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -43,7 +43,7 @@ and optionally performs LLM-based reachability triage.`,
 			scanner := binaryscan.NewScanner()
 			results, err = scanner.ScanTarget(cmd.Context(), target)
 			if err != nil {
-				return fmt.Errorf("scan failed: %w", err)
+				return fmt.Errorf("binary scan failed: %w", err)
 			}
 			if len(results) == 0 && semgrepFlag == "" {
 				if _, err := fmt.Fprintln(cmd.ErrOrStderr(), "Binary scan completed: no supported library signatures detected"); err != nil {
