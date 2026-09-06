@@ -118,7 +118,12 @@ func (c *NVDClient) QueryLibraries(ctx context.Context, matches []LibraryMatch) 
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		c.limiter.wait(ctx)
+		if c.limiter != nil {
+			c.limiter.wait(ctx)
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 
 		vulns, err := c.queryOneWithRetry(ctx, m)
 		if err != nil {
@@ -128,9 +133,7 @@ func (c *NVDClient) QueryLibraries(ctx context.Context, matches []LibraryMatch) 
 			// Degrade gracefully: skip this library rather than failing the whole scan.
 			continue
 		}
-		if len(vulns) > 0 {
-			results[m.Signature.Name] = vulns
-		}
+		results[m.Signature.Name] = vulns
 	}
 	if len(results) == 0 {
 		return nil, nil

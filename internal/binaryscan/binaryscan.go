@@ -36,6 +36,9 @@ func (s *Scanner) ScanTarget(ctx context.Context, targetPath string) ([]findings
 	if s.matchLibrary == nil {
 		s.matchLibrary = MatchSignatures
 	}
+	if s.nvdClient == nil {
+		s.nvdClient = NewNVDClient()
+	}
 
 	info, err := s.parseBinary(targetPath)
 	if err != nil {
@@ -54,9 +57,9 @@ func (s *Scanner) ScanTarget(ctx context.Context, targetPath string) ([]findings
 
 	var results []findings.Finding
 	for _, match := range matches {
-		vulns := vulnsByLib[match.Signature.Name]
+		vulns, enriched := vulnsByLib[match.Signature.Name]
 		if len(vulns) == 0 {
-			results = append(results, unmatchedLibraryFinding(targetPath, *info, match))
+			results = append(results, unmatchedLibraryFinding(targetPath, *info, match, enriched))
 			continue
 		}
 		for _, vuln := range vulns {
@@ -87,9 +90,11 @@ func (s *Scanner) ScanTarget(ctx context.Context, targetPath string) ([]findings
 	return results, nil
 }
 
-func unmatchedLibraryFinding(targetPath string, info BinaryInfo, match LibraryMatch) findings.Finding {
+func unmatchedLibraryFinding(targetPath string, info BinaryInfo, match LibraryMatch, enriched bool) findings.Finding {
 	description := "Detected statically-linked library; CVE enrichment unavailable without a resolved version."
-	if match.Version != "" {
+	if enriched {
+		description = "Detected statically-linked library; no known CVEs were returned by NVD for this version."
+	} else if match.Version != "" {
 		description = "Detected statically-linked library; CVE enrichment unavailable via NVD for this version."
 	}
 	f := findings.Finding{

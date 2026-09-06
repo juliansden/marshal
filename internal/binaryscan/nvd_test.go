@@ -121,6 +121,71 @@ func TestQueryLibrariesPropagatesContextCancellation(t *testing.T) {
 	}
 }
 
+func TestQueryLibrariesContextCanceledWhileRateLimited(t *testing.T) {
+	called := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(nvdResponse{}); err != nil {
+			t.Fatalf("encoding response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	client := &NVDClient{
+		httpClient: server.Client(),
+		baseURL:    server.URL,
+		maxRetries: 0,
+		limiter: &rateLimiter{
+			maxRequests: 1,
+			window:      time.Minute,
+			timestamps:  []time.Time{time.Now()},
+			now:         time.Now,
+			sleep: func(_ context.Context, _ time.Duration) {
+				cancel()
+			},
+		},
+	}
+
+	matches := []LibraryMatch{{Signature: librarySignature{Name: "openssl", CPEVendor: "openssl", CPEProduct: "openssl"}, Version: "1.1.1f"}}
+	result, err := client.QueryLibraries(ctx, matches)
+	if err == nil {
+		t.Fatalf("expected context cancellation error")
+	}
+	if result != nil {
+		t.Fatalf("expected nil result on cancellation, got %+v", result)
+	}
+	if called {
+		t.Fatalf("expected query to stop before HTTP request when context is canceled")
+	}
+}
+
+func TestQueryLibrariesNoLimiterStillQueries(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(nvdResponse{}); err != nil {
+			t.Fatalf("encoding response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	client := &NVDClient{httpClient: server.Client(), baseURL: server.URL, maxRetries: 0, limiter: nil}
+	matches := []LibraryMatch{{Signature: librarySignature{Name: "openssl", CPEVendor: "openssl", CPEProduct: "openssl"}, Version: "1.1.1f"}}
+
+	result, err := client.QueryLibraries(context.Background(), matches)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	vulns, ok := result["openssl"]
+	if !ok {
+		t.Fatalf("expected result key for queried library")
+	}
+	if len(vulns) != 0 {
+		t.Fatalf("expected no vulns for empty response, got %d", len(vulns))
+	}
+}
+
 func TestCPENameEscaping(t *testing.T) {
 	var gotRaw string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
