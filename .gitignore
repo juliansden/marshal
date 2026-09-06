@@ -23,3 +23,6 @@ coverage.txt
 
 # Go
 vendor/
+
+*.sarif
+marshal
